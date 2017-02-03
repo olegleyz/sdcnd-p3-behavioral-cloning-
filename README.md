@@ -29,6 +29,8 @@ data = pd.read_csv(label_file)[['center','left','right','steering']]
 
 ### Data exploration
 
+In this project I'm using the dataset gathered by Udacity on the first track and provided to the students. Given dataset was enough for my model to drive around the track. As there was no such project requirement and model didn't reuqire this as well, I haven't recorded additonal data in the simulator by myself.
+
 The given dataset consists from 7 fields: urls of images from 3 cameras as well as steering angle, throttle, break and speed. There are 8036 samples in the given dataset.
 
 
@@ -159,13 +161,12 @@ plt.hist(data.steering, bins = 40)
 
 
 
-![png](output_10_1.png)
+![png](output_11_1.png)
 
 
 In the given dataset most of the images corresponds to straight forward movement (and steering angle 0). In order to avoid model bias, caused by unbalanced training set, I should generate additional samples with steering angle not equal to zero
 
-### Image transformation
-Given training data consists from the images from 3 frontal camera: left, center and right. Each image has size 320x160 pixels and visualize the image of the road and landscape.
+Given training data consists from the images from 3 frontal camera: left, center and right. Each image has size 320x160 pixels and visualize the image of the road and landscape. Below we can see an example of the image from the camera.
 
 
 ```python
@@ -175,13 +176,15 @@ plt.imshow(plt.imread(data_dir+data.center.iloc[0].strip()))
 
 
 
-    <matplotlib.image.AxesImage at 0x7f181b7717b8>
+    <matplotlib.image.AxesImage at 0x7efc6488e9e8>
 
 
 
 
-![png](output_13_1.png)
+![png](output_14_1.png)
 
+
+### Image transformation
 
 I guess, that the full image is not required to train my network. Landscape and other features may even concern the model. So I'm cropping unnecassary parts to use just the image of the road further. This also increase the speed of training and make the model lighter.
 
@@ -193,18 +196,19 @@ plt.imshow(plt.imread(data_dir+data.center.iloc[0].strip())[74:74+66,50:270,:])
 
 
 
-    <matplotlib.image.AxesImage at 0x7f181b6e7e48>
+    <matplotlib.image.AxesImage at 0x7efc6480bb38>
 
 
 
 
-![png](output_15_1.png)
+![png](output_17_1.png)
 
 
-Emperically, I've finished the preparation of my training set using the following logic:  
-1.  For the samples with steering angle equal to 0, I'm taking just the image from the central camera. Most of the samples in the dataset have 0 steering angle - that is a reason of not taking the images from right and left camera. I might filter all the images with 0 steering angle but then the model misses training data from the straight parts of the road.
-2.  For the samples with non-zero steering angle I'm using images from 3 cameras. For the image from central camera I'm using the given angle as a ground truth. For the images from right and left cameras I'm applying coefficient so, that for example for the right turn, image from the left camera get higher angle and for the left - smaller. This technique helps me to train the recovery path of the car.
-3.  I'm generating additional images from the non-zero angle smaples inplace by flipping the images with non-zero steering angles and changing the sign of the corresponding steering angle. This provides additional samples to train the model.
+#### Choosing the training data and recovery path
+For the training data set images from the camera will be used as features and steering angle as labels. One of the key elements of car's behavior cloning is to train the car how to come back from the side of the road back to the center. That is called "recovery path". Emperically, I've finished the preparation of my training set using the following logic:  
+1.  From the given dataset I'm choosing the samples with steering angle 0 and taking the image from the central camera, label 0.0.
+2.  For the samples with non-zero steering angle I'm using images from 3 cameras. For the image from central camera I'm using the given angle as a ground truth. For the images from right and left cameras I'm applying coefficient so, that for example for the right turn, image from the left camera get steering angle multiplied on coef. (1.1 in my case) and for the left - steering angle divided by a coef. This technique helps me to train the recovery path of the car.
+3.  On the dataset histogram above we've mentioned that dataset has much more images with the steering anle 0. To avoid model bias I'm generating additional images from the non-zero angle smaples inplace by flipping the images with non-zero steering angles and changing the sign of the corresponding steering angle. This provides additional samples to train the model.
 
 I might want to use other geometry/light image transformations to improve the model performance but, at this point of time, I've received working model just with the mentioned approach.
 
@@ -259,24 +263,37 @@ Here is the distribution of the dataset after described pre-processing steps.
 
 
 ```python
-plt.hist(y_train)
+plt.hist(y_train, bins =40)
 ```
 
 
 
 
-    (array([  1.30000000e+01,   2.80000000e+01,   2.37000000e+02,
-              1.96100000e+03,   9.04900000e+03,   1.29910000e+04,
-              1.86400000e+03,   2.31000000e+02,   2.60000000e+01,
-              1.10000000e+01]),
-     array([-1.1 , -0.88, -0.66, -0.44, -0.22,  0.  ,  0.22,  0.44,  0.66,
-             0.88,  1.1 ]),
-     <a list of 10 Patch objects>)
+    (array([  2.00000000e+00,   4.00000000e+00,   2.00000000e+00,
+              5.00000000e+00,   5.00000000e+00,   4.00000000e+00,
+              5.00000000e+00,   1.40000000e+01,   1.70000000e+01,
+              3.20000000e+01,   6.80000000e+01,   1.20000000e+02,
+              2.52000000e+02,   3.61000000e+02,   6.08000000e+02,
+              7.40000000e+02,   1.61100000e+03,   2.31700000e+03,
+              3.07100000e+03,   2.05000000e+03,   6.33300000e+03,
+              2.84800000e+03,   2.07300000e+03,   1.73700000e+03,
+              7.00000000e+02,   5.52000000e+02,   3.87000000e+02,
+              2.25000000e+02,   1.24000000e+02,   5.40000000e+01,
+              3.40000000e+01,   1.90000000e+01,   1.40000000e+01,
+              5.00000000e+00,   2.00000000e+00,   5.00000000e+00,
+              3.00000000e+00,   0.00000000e+00,   6.00000000e+00,
+              2.00000000e+00]),
+     array([-1.1  , -1.045, -0.99 , -0.935, -0.88 , -0.825, -0.77 , -0.715,
+            -0.66 , -0.605, -0.55 , -0.495, -0.44 , -0.385, -0.33 , -0.275,
+            -0.22 , -0.165, -0.11 , -0.055,  0.   ,  0.055,  0.11 ,  0.165,
+             0.22 ,  0.275,  0.33 ,  0.385,  0.44 ,  0.495,  0.55 ,  0.605,
+             0.66 ,  0.715,  0.77 ,  0.825,  0.88 ,  0.935,  0.99 ,  1.045,  1.1  ]),
+     <a list of 40 Patch objects>)
 
 
 
 
-![png](output_19_1.png)
+![png](output_21_1.png)
 
 
 
@@ -320,6 +337,7 @@ model.add(Convolution2D(64, 3, 3, subsample = (1, 1), border_mode='valid',activa
 model.add(Convolution2D(64, 3, 3, subsample = (1, 1), border_mode='valid',activation=akt, init=init))
 
 model.add(Flatten())
+model.add(Dropout(0.5))
 model.add(Dense(100,activation=akt, init=init))
 model.add(Dense(50, activation=akt, init=init))
 model.add(Dense(10, activation=akt, init=init))
@@ -339,21 +357,19 @@ model.fit(np.asarray(X_train), np.asarray(y_train), nb_epoch=10, batch_size=32, 
 
     Train on 21128 samples, validate on 5283 samples
     Epoch 1/10
-    21128/21128 [==============================] - 116s - loss: 0.0173 - val_loss: 0.0103
+    21128/21128 [==============================] - 115s - loss: 0.0180 - val_loss: 0.0080
     Epoch 2/10
-    21128/21128 [==============================] - 119s - loss: 0.0142 - val_loss: 0.0097
+    21128/21128 [==============================] - 114s - loss: 0.0147 - val_loss: 0.0132
     Epoch 3/10
-    21128/21128 [==============================] - 119s - loss: 0.0135 - val_loss: 0.0109
+    21128/21128 [==============================] - 114s - loss: 0.0143 - val_loss: 0.0097
     Epoch 4/10
-    21128/21128 [==============================] - 117s - loss: 0.0129 - val_loss: 0.0109
-    Epoch 5/10
-    21128/21128 [==============================] - 117s - loss: 0.0120 - val_loss: 0.0147
+    21128/21128 [==============================] - 114s - loss: 0.0138 - val_loss: 0.0102
 
 
 
 
 
-    <keras.callbacks.History at 0x7f1813153da0>
+    <keras.callbacks.History at 0x7efc60197fd0>
 
 
 
