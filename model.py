@@ -59,7 +59,7 @@ for i,val in enumerate(data[data.steering==0].iterrows()):
 
 
 # train deep neural network
-akt = 'relu'
+akt = 'elu'
 init = 'he_normal'
 
 model = Sequential()
@@ -73,6 +73,7 @@ model.add(Convolution2D(64, 3, 3, subsample = (1, 1), border_mode='valid',activa
 model.add(Convolution2D(64, 3, 3, subsample = (1, 1), border_mode='valid',activation=akt, init=init))
 
 model.add(Flatten())
+model.add(Dropout(0.5))
 model.add(Dense(100,activation=akt, init=init))
 model.add(Dense(50, activation=akt, init=init))
 model.add(Dense(10, activation=akt, init=init))

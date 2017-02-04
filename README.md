@@ -176,7 +176,7 @@ plt.imshow(plt.imread(data_dir+data.center.iloc[0].strip()))
 
 
 
-    <matplotlib.image.AxesImage at 0x7efc6488e9e8>
+    <matplotlib.image.AxesImage at 0x7fd122470198>
 
 
 
@@ -190,13 +190,13 @@ I guess, that the full image is not required to train my network. Landscape and 
 
 
 ```python
-plt.imshow(plt.imread(data_dir+data.center.iloc[0].strip())[74:74+66,50:270,:])
+plt.imshow(plt.imread(data_dir+data.center.iloc[0].strip())[frame:frame+height,50:270,:])
 ```
 
 
 
 
-    <matplotlib.image.AxesImage at 0x7efc6480bb38>
+    <matplotlib.image.AxesImage at 0x7fd11e3a7a20>
 
 
 
@@ -215,24 +215,27 @@ I might want to use other geometry/light image transformations to improve the mo
 
 ```python
 # choose left image is turn to the right, etc.
-arr_size = 6*len(data[data.steering!=0])+len(data[data.steering==0])
-X_train=np.empty((arr_size,66,220,3))
-y_train=np.empty((arr_size))
-
+frame = 74
+height = 66
 koef=1.1
 
+arr_size = 6*len(data[data.steering!=0])+len(data[data.steering==0])
+X_train=np.empty((arr_size,height,220,3))
+y_train=np.empty((arr_size))
+
+
 for i,val in enumerate(data[data.steering!=0].iterrows()):        
-        X_train[6*i] = plt.imread(data_dir + val[1].center.strip())[74:74+66,50:270,:]
+        X_train[6*i] = plt.imread(data_dir + val[1].center.strip())[frame:frame+height,50:270,:]
         y_train[6*i] = val[1].steering
 
         X_train[6*i+1] = X_train[2*i][:,::-1]
         y_train[6*i+1] = -1*y_train[2*i]
 
         if val[1].steering>0:
-            X_train[6*i+2] = plt.imread(data_dir + val[1].left.strip())[74:74+66,50:270,:]
+            X_train[6*i+2] = plt.imread(data_dir + val[1].left.strip())[frame:frame+height,50:270,:]
             y_train[6*i+2] = val[1].steering*koef
 
-            X_train[6*i+3] = plt.imread(data_dir + val[1].right.strip())[74:74+66,50:270,:]
+            X_train[6*i+3] = plt.imread(data_dir + val[1].right.strip())[frame:frame+height,50:270,:]
             y_train[6*i+3] = val[1].steering/koef
 
             X_train[6*i+4] = X_train[6*i+2][:,::-1]
@@ -241,10 +244,10 @@ for i,val in enumerate(data[data.steering!=0].iterrows()):
             X_train[6*i+5] = X_train[6*i+3][:,::-1]
             y_train[6*i+5] = y_train[6*i+3]*-1
         else:
-            X_train[6*i+2] = plt.imread(data_dir + val[1].left.strip())[74:74+66,50:270,:]
+            X_train[6*i+2] = plt.imread(data_dir + val[1].left.strip())[frame:frame+height,50:270,:]
             y_train[6*i+2] = val[1].steering/koef
 
-            X_train[6*i+3] = plt.imread(data_dir + val[1].right.strip())[74:74+66,50:270,:]
+            X_train[6*i+3] = plt.imread(data_dir + val[1].right.strip())[frame:frame+height,50:270,:]
             y_train[6*i+3] = val[1].steering*koef
 
             X_train[6*i+4] = X_train[6*i+2][:,::-1]
@@ -255,7 +258,7 @@ for i,val in enumerate(data[data.steering!=0].iterrows()):
         
         
 for i,val in enumerate(data[data.steering==0].iterrows()):
-        X_train[i + 6*len(data[data.steering!=0])] = plt.imread(data_dir + val[1].center.strip())[74:74+66,50:270,:]
+        X_train[i + 6*len(data[data.steering!=0])] = plt.imread(data_dir + val[1].center.strip())[frame:frame+height,50:270,:]
         y_train[i + 6*len(data[data.steering!=0])] = 0.0        
 ```
 
@@ -309,12 +312,13 @@ print('The training dataset consists from {} images with the size {} x {} and {}
 In order to train the car to drive, I've used the architecture of neural network, created by NVIDIA in the End to End Learning for Self-Driving Cars article[1]. 
   
 The network consists of 9 layers, including a normalization layer, 5 convolutional layers
-and 3 fully connected layers. Strided convolutions are used in the first three convolutional layers with a 2×2 stride and a 5×5 kernel and a non-strided convolution with a 3×3 kernel size in the last two convolutional layers.
+and 3 fully connected layers. Strided convolutions are used in the first three convolutional layers with a 2×2 stride and a 5×5 kernel and a non-strided convolution with a 3×3 kernel size in the last two convolutional layers. Convnets are followed by 3 fully connected. Activation function is ELU (exponential linear unit).
+
   
 The last fully connected layer has a single output which predicts continuos value of steering angle.
   
 Using described dataset and NVIDIA's model, the car could successfully drive through the track.
-However, in order to manage possible overfitting, the dropout layers were added after 3rd and 5th convolutional layers.
+However, in order to manage possible overfitting, the dropout layers were added before first fully connected layer.
   
 I'm using mean squared error metric to minimize loss during the back propogation iterations and Adam optimizer.
 In order to decrease the training time of the model, when the validation loss isn't decreasing, I'm using early stopping function of Keras.
@@ -322,8 +326,12 @@ In order to decrease the training time of the model, when the validation loss is
 During the training, I'm splitting the data into training and validation datasets with the proportion 80:20 using Keras built-in function.
 
 
+
+### The model and weights are saved in 2 files and might be used further in order to validate the model in a car simulator.
+
+
 ```python
-akt = 'relu'
+akt = 'elu'
 init = 'he_normal'
 
 model = Sequential()
@@ -351,29 +359,31 @@ early_stopping = EarlyStopping(monitor='val_loss', patience=2)
 
 model.fit(np.asarray(X_train), np.asarray(y_train), nb_epoch=10, batch_size=32, validation_split=0.2,
           callbacks=[early_stopping])
-
-
 ```
 
     Train on 21128 samples, validate on 5283 samples
     Epoch 1/10
-    21128/21128 [==============================] - 115s - loss: 0.0180 - val_loss: 0.0080
+    21128/21128 [==============================] - 124s - loss: 0.1217 - val_loss: 0.0075
     Epoch 2/10
-    21128/21128 [==============================] - 114s - loss: 0.0147 - val_loss: 0.0132
+    21128/21128 [==============================] - 123s - loss: 0.0238 - val_loss: 0.0076
     Epoch 3/10
-    21128/21128 [==============================] - 114s - loss: 0.0143 - val_loss: 0.0097
+    21128/21128 [==============================] - 123s - loss: 0.0204 - val_loss: 0.0098
     Epoch 4/10
-    21128/21128 [==============================] - 114s - loss: 0.0138 - val_loss: 0.0102
+    21128/21128 [==============================] - 123s - loss: 0.0188 - val_loss: 0.0074
+    Epoch 5/10
+    21128/21128 [==============================] - 123s - loss: 0.0175 - val_loss: 0.0116
+    Epoch 6/10
+    21128/21128 [==============================] - 123s - loss: 0.0167 - val_loss: 0.0081
+    Epoch 7/10
+    21128/21128 [==============================] - 122s - loss: 0.0160 - val_loss: 0.0107
 
 
 
 
 
-    <keras.callbacks.History at 0x7efc60197fd0>
+    <keras.callbacks.History at 0x7fbedf2960b8>
 
 
-
-### The model and weights are saved in 2 files and might be used further in order to validate the model in a car simulator.
 
 
 ```python
